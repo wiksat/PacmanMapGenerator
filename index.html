@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Generator Mapy Pac-Man</title>
+    <style>
+        body {
+            background-color: black;
+        }
+
+        * {
+            margin: 0;
+            /* box-sizing: border-box; */
+        }
+
+        canvas {
+            border: 0;
+        }
+
+        .lewa {
+            /* border: 1px solid grey; */
+            float: left;
+            opacity: 0.5;
+        }
+
+        .lewa:hover {
+            opacity: 1;
+        }
+
+        .lewa:nth-child(16n+1) {
+            clear: both;
+        }
+
+        .cp {
+            background-color: black;
+            border: dotted 1px white;
+            display: inline-block;
+            clear: both;
+            right: 0;
+        }
+
+        #lewa {
+            float: left;
+            width: 384px;
+            height: 960px;
+            border: 1px solid grey;
+        }
+
+        input {
+            display: inline-block;
+            margin-left: 50px;
+        }
+
+        #prawa {
+            position: relative;
+            float: left;
+            width: 1060px;
+            height: 960px;
+            margin-left: 50px;
+        }
+
+        .cp_h {
+            border: dotted 1px red;
+            /* background-color: pink; */
+        }
+
+        #plachta {
+            display: none;
+            position: absolute;
+            background-color: yellowgreen;
+            width: 1px;
+            height: 1px;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        #menu {
+            position: fixed;
+            left: 42%;
+            top: 20vh;
+            border: 5px black solid;
+        }
+
+        .poz {
+            width: 100%;
+            height: 30px;
+            border: 2px dotted black;
+            text-align: center;
+            opacity: 0.5;
+        }
+
+        .poz:hover {
+            opacity: 1;
+        }
+
+        #contener {
+            width: 1846px;
+            color: white;
+            height: 960px;
+        }
+
+        h5 {
+            display: inline-block;
+        }
+
+        #file {
+            display: none;
+        }
+
+        .past {
+            border: dotted 1px violet;
+            pointer-events: none;
+        }
+    </style>
+
+</head>
+
+<body id="body">
+    <script>
+        class MapGenerator {
+            constructor(src, w, h) {
+                var img = new Image();
+                this.tablica = []
+                this.w = w
+                this.h = h
+                this.left = 0
+                this.a = false
+                img.src = src;
+                img.onload = (e) => {
+                    this.img = e.target;
+                    this.generujLewa();
+                    this.generujPrawa();
+                }
+                this.is_ctrl = false
+                this.is_down = false
+                document.body.onkeydown = (e) => {
+                    if (e.key == "s" || e.key == "l") {
+                        e.preventDefault()
+                    }
+                    this.key_down(e.key, this);
+
+                }
+                this.ruch = false
+
+                document.body.onkeyup = (e) => {
+                    this.key_up(e.key, this);
+                }
+                document.body.onclick = e => {
+                    if (e.target.classList == "poz") {
+                        this.wybory(e)
+                    }
+                    if (this.ruch == true) {
+                        this.ruch = false
+                        this.scal()
+                    }
+
+
+                }
+                document.body.onmousedown = (e) => {
+                    if (e.target.parentNode.id == "prawa" || e.target.id == "prawa") {
+                        this.mousedown(e.pageX, e.pageY, this);
+                        this.is_down = true
+                    }
+
+                }
+                document.body.onmousemove = (e) => {
+                    if (e.target.parentNode.id == "prawa" || e.target.id == "prawa") {
+                        this.mousemove(e.pageX, e.pageY, this);
+                    }
+                    if (this.pasta == true) {
+                        this.paste(e)
+                        this.pasta = false
+                    }
+                    if (this.ruch == true) {
+                        this.ruszanie(e)
+                    }
+                }
+                document.body.onmouseup = (e) => {
+                    if (e.target.parentNode.id == "prawa" || e.target.id == "prawa") {
+                        this.mouseup(e.pageX, e.pageY, this);
+                        this.is_down = false
+                    }
+                }
+                this.pasta = false
+                this.contextMenu()
+                this.kroki = []
+                this.count = 0
+                this.back = 0
+            }
+            undo() {
+                if (this.back < this.count) {
+                    this.back++
+                    console.log(this.kroki)
+                    console.log(this.count)
+                    console.log(this.kroki.length)
+                    var a = document.getElementsByClassName("cp")
+                    for (let i = 0; i < a.length; i++) {
+                        var g = this.kroki[this.count - this.back][i].gora
+                        var l = this.kroki[this.count - this.back][i].lewa
+                        a[i].dataset.lewa = l
+                        a[i].dataset.gora = g
+                        var canvas = a[i]
+                        let ctx = canvas.getContext("2d")
+                        ctx.drawImage(this.img, l, g, 48, 48, 0, 0, 24, 24);
+                    }
+                }
+
+            }
+            redo() {
+                if (this.back > 0) {
+                    this.back--
+                    var a = document.getElementsByClassName("cp")
+                    for (let i = 0; i < a.length; i++) {
+                        var g = this.kroki[this.count - this.back][i].gora
+                        var l = this.kroki[this.count - this.back][i].lewa
+                        a[i].dataset.lewa = l
+                        a[i].dataset.gora = g
+                        var canvas = a[i]
+                        let ctx = canvas.getContext("2d")
+                        ctx.drawImage(this.img, l, g, 48, 48, 0, 0, 24, 24);
+                    }
+                }
+            }
+            cut() {
+                this.tablica = []
+                console.log("cut")
+                var a = document.getElementsByClassName("cp_h")
+                for (let i = 0; i < a.length; i++) {
+                    var l = a[i].dataset.lewa
+                    var g = a[i].dataset.gora
+                    var id = a[i].id
+                    console.log(l, g)
+                    var obj = { l: l, g: g, id: id }
+                    this.tablica.push(obj)
+                }
+                console.log(this.tablica)
+
+                for (let i = 0; i < a.length; i++) {
+                    a[i].dataset.lewa = 0
+                    a[i].dataset.gora = 96
+                    var canvas = a[i]
+                    let ctx = canvas.getContext("2d")
+                    ctx.drawImage(this.img, 0, 96, 48, 48, 0, 0, 24, 24);
+
+                }
+                this.odznacz()
+                var d = document.getElementsByClassName("cp")
+                var tab = []
+                for (let i = 0; i < d.length; i++) {
+                    tab.push({ lewa: d[i].dataset.lewa, gora: d[i].dataset.gora })
+                }
+                this.kroki.push(tab)
+                console.log(this.kroki)
+                this.count++
+                console.log(this.count)
+            }
+            copy() {
+                this.tablica = []
+                console.log("copy")
+                var a = document.getElementsByClassName("cp_h")
+                for (let i = 0; i < a.length; i++) {
+                    var l = a[i].dataset.lewa
+                    var g = a[i].dataset.gora
+                    var id = a[i].id
+                    console.log(l, g)
+                    var obj = { l: l, g: g, id: id }
+                    this.tablica.push(obj)
+                }
+                console.log(this.tablica)
+                this.odznacz()
+            }
+            paste(e) {
+                if (this.tablica.length > 0) {
+                    console.log("paste")
+                    for (let i = 0; i < this.tablica.length; i++) {
+                        console.log(this.tablica[i])
+                    }
+                    for (let i = 0; i < this.tablica.length; i++) {
+                        var g = this.tablica[i].g
+                        var l = this.tablica[i].l
+                        var id = this.tablica[i].id
+                        let canvas = document.createElement("canvas")
+                        canvas.style.position = "absolute"
+                        canvas.style.zIndex = "7"
+                        canvas.width = this.w / 2
+                        canvas.height = this.h / 2
+                        canvas.classList = "past"
+                        canvas.style.top = i * 10 + "px"
+                        canvas.style.left = i * 10 + "px"
+                        canvas.dataset.lewa = l
+                        canvas.dataset.gora = g
+                        canvas.dataset.id = id
+                        let ctx = canvas.getContext("2d")
+                        ctx.drawImage(this.img, l, g, 48, 48, 0, 0, 24, 24);
+                        document.body.appendChild(canvas)
+                    }
+                    console.log(e.pageX, "+", e.pageY)
+                    this.ruch = true
+                }
+            }
+            ruszanie(e) {
+                var all = document.getElementsByClassName("past")
+                var gl = all[0].dataset.id.split("_")
+                for (let i = 0; i < all.length; i++) {
+                    var sp = all[i].dataset.id.split("_")
+
+                    let cleft = parseInt(e.target.getBoundingClientRect().left)
+                    let ctop = parseInt(e.target.getBoundingClientRect().top + window.scrollY)
+
+                    all[i].style.top = ctop + (sp[1] - gl[1]) * this.w / 2 + "px"
+                    all[i].style.left = cleft + (sp[2] - gl[2]) * this.h / 2 + "px"
+                }
+            }
+            scal() {
+                console.log("SCASLANIE")
+                var pas = document.getElementsByClassName("past")
+                var all = document.getElementsByClassName("cp")
+                for (let i = 0; i < pas.length; i++) {
+                    for (let z = 0; z < all.length; z++) {
+                        if (all[z].getBoundingClientRect().left == pas[i].getBoundingClientRect().left) {
+                            if (all[z].getBoundingClientRect().top + window.scrollY == pas[i].getBoundingClientRect().top + window.scrollY) {
+                                console.log("znaleziono")
+
+                                console.log(pas[i].dataset.gora, pas[i].dataset.lewa)
+
+                                var g = pas[i].dataset.gora
+                                var l = pas[i].dataset.lewa
+                                all[z].dataset.lewa = l
+                                all[z].dataset.gora = g
+                                var canvas = all[z]
+                                let ctx = canvas.getContext("2d")
+                                ctx.drawImage(this.img, l, g, 48, 48, 0, 0, 24, 24);
+                            }
+                        }
+                    }
+                }
+                document.querySelectorAll('.past').forEach(function (a) {
+                    a.remove()
+                })
+                var d = document.getElementsByClassName("cp")
+                var tab = []
+                for (let i = 0; i < d.length; i++) {
+                    tab.push({ lewa: d[i].dataset.lewa, gora: d[i].dataset.gora })
+                }
+                this.kroki.push(tab)
+                console.log(this.kroki)
+                this.count++
+                console.log(this.count)
+
+            }
+            delete() {
+                console.log("delete")
+                var a = document.getElementsByClassName("cp_h")
+                for (let i = 0; i < a.length; i++) {
+                    a[i].dataset.lewa = 0
+                    a[i].dataset.gora = 96
+                    var canvas = a[i]
+                    let ctx = canvas.getContext("2d")
+                    ctx.drawImage(this.img, 0, 96, 48, 48, 0, 0, 24, 24);
+                }
+                this.odznacz()
+                var d = document.getElementsByClassName("cp")
+                var tab = []
+                for (let i = 0; i < d.length; i++) {
+                    // console.log(d[i])
+                    tab.push({ lewa: d[i].dataset.lewa, gora: d[i].dataset.gora })
+                }
+                this.kroki.push(tab)
+                console.log(this.kroki)
+                this.count++
+                console.log(this.count)
+            }
+            odznacz() {
+                var a = document.querySelectorAll(".cp_h")
+                for (let i = a.length - 1; i >= 0; i--) {
+                    a[i].classList.remove("cp_h");
+                }
+            }
+            save() {
+                var tablica = []
+                var d = document.getElementsByClassName("cp")
+                for (let i = 0; i < d.length; i++) {
+                    // console.log(d[i])
+                    tablica.push({ lewa: d[i].dataset.lewa, gora: d[i].dataset.gora })
+                }
+                // console.log(tablica)
+                let url = URL.createObjectURL(new Blob([JSON.stringify(tablica)], { type: "application/json" }));
+                let a = document.createElement("a");
+                a.download = 'data.json';
+                a.href = url
+                a.click();
+            }
+            load(dis) {
+                console.log("testddsfbidsesdveib")
+                var file = document.getElementById('file').files[0];
+                this.getAsText(file);
+            }
+            getAsText(readFile) {
+                var reader = new FileReader();
+                reader.readAsText(readFile, "UTF-8");
+                reader.onload = (e) => {
+                    console.log(e.target.result)
+                    var wynik = JSON.parse(e.target.result)
+                    console.log(wynik)
+                    console.log(wynik[3].gora)
+                    var a = document.getElementsByClassName("cp")
+                    console.log(a.length)
+                    for (let i = 0; i < a.length; i++) {
+                        var g = wynik[i].gora
+                        var l = wynik[i].lewa
+                        a[i].dataset.lewa = l
+                        a[i].dataset.gora = g
+                        var canvas = a[i]
+                        let ctx = canvas.getContext("2d")
+                        ctx.drawImage(this.img, l, g, 48, 48, 0, 0, 24, 24);
+                    }
+                    var d = document.getElementsByClassName("cp")
+                    var tab = []
+                    for (let i = 0; i < d.length; i++) {
+                        // console.log(d[i])
+                        tab.push({ lewa: d[i].dataset.lewa, gora: d[i].dataset.gora })
+                    }
+                    this.kroki.push(tab)
+                    console.log(this.kroki)
+                    this.count++
+                    console.log(this.count)
+                };
+            }
+
+            wybory(e) {
+                switch (e.target.innerHTML.toLowerCase()) {
+                    case "undo ctrl+z":
+                        console.log(e.target.innerHTML)
+                        this.undo()
+                        break
+                    case "redo ctrl+y":
+                        this.redo()
+                        break
+                    case "cut ctrl+x":
+                        this.cut()
+                        break
+                    case "copy ctrl+c":
+                        this.copy()
+                        break
+                    case "paste ctrl+v":
+                        this.pasta = true
+                        break
+                    case "delete del":
+                        this.delete()
+                        break
+                    case "save to file ctrl+s":
+                        console.log("save")
+                        this.save()
+                        break
+                    case "load data from file ctrl+l":
+                        console.log("load")
+                        document.getElementById('file').click()
+                        break
+                }
+                this.a = !this.a
+                this.menu()
+            }
+            key_down(klawisz, ten) {
+                if (klawisz == "Meta" || klawisz == "Control") {
+                    ten.is_ctrl = true
+                    console.log("meta")
+                }
+                if (this.is_ctrl == true && klawisz == "z") {
+                    this.undo()
+                }
+                if (this.is_ctrl == true && klawisz == "y") {
+                    this.redo()
+                }
+                if (this.is_ctrl == true && klawisz == "x") {
+                    this.cut()
+                }
+                if (this.is_ctrl == true && klawisz == "c") {
+                    this.copy()
+                }
+                if (this.is_ctrl == true && klawisz == "v") {
+                    this.pasta = true
+                }
+                if (klawisz == "Delete") {
+                    this.delete()
+                }
+                if (this.is_ctrl == true && klawisz == "s") {
+                    this.save()
+                }
+                if (this.is_ctrl == true && klawisz == "l") {
+                    document.getElementById('file').click()
+                }
+                if (klawisz == "Escape") {
+                    this.a = !this.a
+                    this.menu()
+                }
+            }
+            key_up(klawisz, ten) {
+                if (klawisz == "Meta" || klawisz == "Control") {
+                    ten.is_ctrl = false
+                }
+            }
+            contextMenu() {
+                document.body.addEventListener("contextmenu", () => {
+                    event.preventDefault()
+                    console.log("menu")
+                    this.a = !this.a
+                    this.menu()
+                })
+            }
+            menu() {
+                if (this.a) {
+                    document.getElementById("contener").style.opacity = 0.5
+                    var menu = document.createElement("div")
+                    menu.style.width = 200 + "px"
+                    menu.style.height = 270 + "px"
+                    menu.style.backgroundColor = "white"
+                    menu.style.zIndex = "3"
+                    menu.id = "menu"
+                    document.body.appendChild(menu)
+                    var p1 = document.createElement("div")
+                    p1.classList = "poz"
+                    p1.innerHTML = "Undo Ctrl+Z"
+                    document.getElementById("menu").appendChild(p1)
+                    var p1 = document.createElement("div")
+                    p1.classList = "poz"
+                    p1.innerHTML = "Redo Ctrl+Y"
+                    document.getElementById("menu").appendChild(p1)
+                    var p1 = document.createElement("div")
+                    p1.classList = "poz"
+                    p1.innerHTML = "Cut Ctrl+X"
+                    document.getElementById("menu").appendChild(p1)
+                    var p1 = document.createElement("div")
+                    p1.classList = "poz"
+                    p1.innerHTML = "Copy Ctrl+C"
+                    document.getElementById("menu").appendChild(p1)
+                    var p1 = document.createElement("div")
+                    p1.classList = "poz"
+                    p1.innerHTML = "Paste Ctrl+V"
+                    document.getElementById("menu").appendChild(p1)
+                    var p1 = document.createElement("div")
+                    p1.classList = "poz"
+                    p1.innerHTML = "Delete Del"
+                    document.getElementById("menu").appendChild(p1)
+                    var p1 = document.createElement("div")
+                    p1.classList = "poz"
+                    p1.innerHTML = "Save to file Ctrl+S"
+                    document.getElementById("menu").appendChild(p1)
+                    var p1 = document.createElement("div")
+                    p1.classList = "poz"
+                    p1.innerHTML = "Load data from file Ctrl+L"
+                    document.getElementById("menu").appendChild(p1)
+                } else {
+                    document.getElementById("contener").style.opacity = 1
+                    document.getElementById("body").removeChild(document.getElementById("menu"));
+                }
+            }
+            mousedown(x, y) {
+                console.log("test")
+                document.getElementById("plachta").style.display = "block"
+                document.getElementById("plachta").style.left = x + "px"
+                document.getElementById("plachta").style.top = y + "px"
+                this.left = x
+                this.top = y
+            }
+            mousemove(x, y) {
+                if (this.is_down) {
+                    if (this.left < x && this.top < y) {
+                        document.getElementById("plachta").style.height = y - this.top + "px"
+                        document.getElementById("plachta").style.width = x - this.left + "px"
+                    } else if (this.left > x && this.top > y) {
+                        document.getElementById("plachta").style.width = this.left - x + "px"
+                        document.getElementById("plachta").style.left = x + "px"
+                        document.getElementById("plachta").style.height = this.top - y + "px"
+                        document.getElementById("plachta").style.top = y + "px"
+                    } else if (this.left > x && this.top < y) {
+                        document.getElementById("plachta").style.width = this.left - x + "px"
+                        document.getElementById("plachta").style.left = x + "px"
+                        document.getElementById("plachta").style.height = y - this.top + "px"
+                    } else {
+                        document.getElementById("plachta").style.width = x - this.left + "px"
+                        document.getElementById("plachta").style.height = this.top - y + "px"
+                        document.getElementById("plachta").style.top = y + "px"
+                    }
+                    this.plachta()
+                }
+            }
+            mouseup() {
+                document.getElementById("plachta").style.display = "none"
+                document.getElementById("plachta").style.width = 1 + "px"
+                document.getElementById("plachta").style.height = 1 + "px"
+
+            }
+            plachta() {
+                if (this.is_ctrl == false) {
+                    var allstars = document.querySelectorAll(".cp_h")
+                    for (let i = 0; i < allstars.length; i++) {
+                        allstars[i].classList.remove("cp_h")
+                    }
+                }
+                var pl = document.getElementById("plachta")
+                let left = parseInt(pl.style.left)
+                let width = parseInt(pl.style.left) + parseInt(pl.style.width)
+                let top = parseInt(pl.style.top)
+                let height = parseInt(pl.style.top) + parseInt(pl.style.height)
+                var all = document.querySelectorAll(".cp")
+                for (let i = 0; i < all.length; i++) {
+                    let cleft = parseInt(all[i].getBoundingClientRect().left)
+                    let cwidth = parseInt(all[i].getBoundingClientRect().left) + parseInt(all[i].getBoundingClientRect().width)
+                    let ctop = parseInt(all[i].getBoundingClientRect().top + window.scrollY)
+                    let cheight = parseInt(all[i].getBoundingClientRect().top + window.scrollY) + parseInt(all[i].getBoundingClientRect().height)
+                    if (cleft <= width && cwidth >= left && ctop <= height && cheight >= top) {
+                        all[i].classList.add("cp_h")
+                    }
+                }
+                for (let i = 0; i < all.length; i++) {
+                    all[i].style.height
+                }
+
+            }
+
+
+            generujLewa() {
+                this.contener = document.createElement("div")
+                this.contener.id = "contener"
+                document.body.appendChild(this.contener)
+                var lewa = document.createElement("div")
+                this.contener.appendChild(lewa)
+                lewa.id = "lewa"
+                for (let i = 0; i < 40; i++) {
+                    for (let z = 0; z < 16; z++) {
+                        let canvas = document.createElement("canvas")
+                        let ctx = canvas.getContext("2d")
+                        canvas.classList = "lewa"
+                        canvas.id = "l_" + i + "_" + z
+                        canvas.width = this.w / 2
+                        canvas.height = this.h / 2
+                        if (i >= 20) {
+                            ctx.drawImage(this.img, 768 + z * 48, this.h * (i - 20), this.w, this.h, 0, 0, this.w / 2, this.h / 2);
+                        } else {
+                            ctx.drawImage(this.img, this.w * z, this.h * i, this.w, this.h, 0, 0, this.w / 2, this.h / 2);
+                        }
+
+                        canvas.onclick = (e) => {
+                            //add_class
+                            // console.log(e)
+                            //////////////
+
+                            ////////
+                            var lewa = e.target.offsetLeft
+                            var gora = e.target.offsetTop
+                            console.log(lewa, gora)
+                            let els = document.getElementsByClassName("cp_h");
+                            for (let i = 0; i < els.length; i++) {
+                                var ctx = els[i].getContext("2d");
+                                ctx.drawImage(e.target, 0, 0, this.w, this.h, 0, 0, this.w, this.w);
+                                if (gora < 460) {
+                                    els[i].dataset.lewa = lewa * 2 - 2
+                                    els[i].dataset.gora = gora * 2 - 2
+                                } else {
+                                    console.log("przekładka")
+                                    els[i].dataset.lewa = lewa * 2 - 2 + 768
+                                    els[i].dataset.gora = gora * 2 - 2 - 960
+                                }
+
+                            }
+                            var a = document.querySelectorAll(".cp_h")
+                            //remove_class
+                            for (let i = els.length - 1; i >= 0; i--) {
+                                els[i].classList.remove("cp_h");
+                            }
+                            this.next(a)
+                            ////////////////////////////////////////////////////////////////////////////////
+
+                            console.log("dodawanie")
+
+                            var d = document.getElementsByClassName("cp")
+                            var tab = []
+                            for (let i = 0; i < d.length; i++) {
+                                // console.log(d[i])
+                                tab.push({ lewa: d[i].dataset.lewa, gora: d[i].dataset.gora })
+                            }
+                            this.kroki.push(tab)
+                            console.log(this.kroki)
+                            this.count++
+                            console.log(this.count)
+
+                            //////////////////////
+                        }
+                        lewa.appendChild(canvas)
+                    }
+                }
+                var check = document.createElement("input")
+                var h5 = document.createElement("h5")
+                check.setAttribute('type', 'checkbox')
+                h5.innerHTML = "AUTOMAT"
+                check.id = "check"
+                this.contener.appendChild(check)
+                this.contener.appendChild(h5)
+            }
+            generujPrawa() {
+                var prawa = document.createElement("div")
+                this.contener.append(prawa)
+                prawa.id = "prawa"
+                for (let i = 1; i <= 38; i++) {
+                    for (let j = 1; j <= 40; j++) {
+                        let canvas = document.createElement("canvas");;
+                        let ctx = canvas.getContext("2d");
+                        canvas.style.position = "absolute"
+                        canvas.style.left = j * 24 + "px"
+                        canvas.style.top = i * 24 + "px"
+                        canvas.width = this.w / 2;
+                        canvas.height = this.h / 2;
+                        canvas.id = "p_" + i + "_" + j
+                        canvas.dataset.lewa = 0
+                        canvas.dataset.gora = 96
+                        canvas.onclick = (e) => {
+                            this.dodaj_klasa_prawa(this, e);
+                        }
+                        canvas.classList.add("cp");
+                        prawa.appendChild(canvas);
+                        if (j == 20) {
+                            canvas.style.clear = "both"
+                        }
+                    }
+                }
+                if (this.kroki.length == 0) {
+                    var d = document.getElementsByClassName("cp")
+                    var tab = []
+                    for (let i = 0; i < d.length; i++) {
+                        tab.push({ lewa: d[i].dataset.lewa, gora: d[i].dataset.gora })
+                    }
+                    this.kroki.push(tab)
+                    console.log(this.kroki)
+                }
+            }
+            dodaj_klasa_prawa(dis, e) {
+                let els = document.getElementsByClassName("cp_h");
+                if (dis.is_ctrl == false) {
+                    for (let i = els.length - 1; i >= 0; i--) {
+                        els[i].classList.remove("cp_h");
+                    }
+                }
+                if (e.target.classList.contains("cp_h")) {
+                    e.target.classList.remove("cp_h")
+                } else {
+                    e.target.classList.add("cp_h")
+                    e.target.onclick = (e) => {
+                        this.dodaj_klasa_prawa(this, e);
+                    }
+                }
+
+
+            }
+            next(a) {
+                if (document.getElementById("check").checked) {
+                    console.log(a);
+                    if (a.length > 0) {
+                        a[a.length - 1].nextElementSibling.click()
+                    }
+                }
+            }
+        }
+
+        window.addEventListener("DOMContentLoaded", function () {
+            ttt = new MapGenerator("sprites.png", 48, 48);
+        })
+
+    </script>
+    <input type="file" name="file" id="file" onchange="ttt.load(this)" />
+    <div id="plachta"></div>
+</body>
+
+</html>
